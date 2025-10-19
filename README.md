@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Quizz App
 
-## Getting Started
+Aplicação web de quiz construída com Next.js 15, React 19 e Tailwind CSS 4. O projeto está em fase inicial e serve como base para evoluir rapidamente para uma experiência de perguntas e respostas customizável.
 
-First, run the development server:
+## Visão geral
+
+- **Stack:** Next.js (App Router), React, TypeScript, Tailwind CSS e ShadCN UI.
+- **Renderização:** componentes React server/client conforme a necessidade de estado.
+- **Estilos:** utilitários do Tailwind definidos em `src/app/globals.css`.
+- **Empacotamento:** Turbopack habilitado por padrão para desenvolvimento (`next dev --turbopack`).
+
+## Requisitos
+
+- Node.js 20 LTS (ou superior compatível com Next.js 15).
+- PNPM 9+ (recomendado; o arquivo `pnpm-lock.yaml` já está versionado).
+
+## Instalação e execução
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install     # instala dependências
+pnpm dev         # levanta o servidor em http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Outros scripts úteis:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `pnpm build` – gera a versão de produção.
+- `pnpm start` – executa o servidor em modo produção após o build.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> Caso prefira npm, ajuste os comandos (`npm install`, `npm run dev`, etc.). Use apenas um gerenciador de pacotes por vez para evitar conflitos de lockfile.
 
-## Learn More
+## Estrutura do projeto
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  app/
+    layout.tsx     # layout raiz usando App Router
+    page.tsx       # landing com atalhos de navegação
+    quizzes/
+      new/
+        _components/
+          create-quiz-form.tsx  # formulário de criação usando React Hook Form + shadcn/ui
+          question-fields.tsx   # bloco reutilizável de perguntas e alternativas
+        schema.ts               # esquemas Zod e defaults do formulário
+        page.tsx                # rota que orquestra o formulário e layout
+    docs/
+      regras/
+        page.tsx   # exibe docs/REGRAS_PROJETO.md na aplicação
+  components/
+    ui/            # componentes gerados pelo ShadCN UI
+  globals.css      # estilos compartilhados em Tailwind
+docs/
+  REGRAS_PROJETO.md
+public/
+  ...              # ícones, imagens e manifestos da aplicação
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Componentes compartilhados futuros devem ficar em `src/components`.
+- Recursos estáticos (imagens, ícones) residem em `public/`.
+- Scripts de automação ou utilitários podem ser organizados em `scripts/` quando necessários.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Desenvolvimento
 
-## Deploy on Vercel
+1. Crie uma branch a partir da `main` seguindo a convenção descrita nas [regras do projeto](docs/REGRAS_PROJETO.md).
+2. Implemente novas telas ou lógicas em componentes desacoplados e reutilizáveis.
+3. Documente comportamentos relevantes no README ou em arquivos específicos em `docs/`.
+4. Execute os scripts de verificação antes de abrir merge requests. No momento, priorize `pnpm build` para garantir que o projeto continua compilando.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Tailwind CSS
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+O Tailwind 4 não requer o arquivo `tailwind.config.js` para a maioria dos casos simples. Ajustes adicionais podem ser feitos via `postcss.config.mjs` se necessários. Utilize classes utilitárias para manter consistência de design.
+
+## Componentes ShadCN UI
+
+- Inicialize o kit com `pnpm dlx shadcn@latest init -y` (executar apenas uma vez).
+- Adicione novos componentes com `pnpm dlx shadcn@latest add <componente>`; os arquivos serão gerados em `src/components/ui`.
+- Mantenha tokens de tema e variações no arquivo `src/app/globals.css` ou em camadas específicas, seguindo a documentação oficial.
+- Sempre que atualizar tokens de cor ou tipografia, valide o impacto em modo claro/escuro.
+
+## Documentação e regras
+
+As regras de contribuição, convenções de nomenclatura e checklist para PRs estão documentadas em [`docs/REGRAS_PROJETO.md`](docs/REGRAS_PROJETO.md). Mantenha esse documento atualizado sempre que novas práticas forem adotadas.
+
+## Roadmap inicial sugerido
+
+- Definir o modelo de dados do quiz (perguntas, alternativas, tempos).
+- Implementar fluxo básico de perguntas e respostas com feedback visual.
+- Persistir progresso do usuário usando storage local ou API.
+- Adicionar testes automatizados (unitários e e2e) assim que a base funcional estiver estável.
+
+Contribuições são bem-vindas! Atualize este README com quaisquer decisões arquiteturais ou ferramentas adicionadas ao projeto.
