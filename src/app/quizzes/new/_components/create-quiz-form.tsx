@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { ChangeEvent, useRef, useState } from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2 } from "lucide-react";
+import { FileText, Loader2, X } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 
@@ -45,6 +45,7 @@ type QuizPreview = {
 };
 
 const AI_GENERATION_ENDPOINT = "/api/quizzes/generate";
+const MAX_MARKDOWN_FILE_SIZE = 512 * 1024; // 512 KB
 
 const quizValuesToPreview = (values: QuizFormValues): QuizPreview => ({
     title: values.title,
@@ -107,8 +108,17 @@ const downloadQuizMarkdown = (quiz: QuizPreview) => {
 };
 
 export function CreateQuizForm() {
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [prompt, setPrompt] = useState("");
     const [preview, setPreview] = useState<QuizPreview | null>(null);
+    const [markdownFile, setMarkdownFile] = useState<{
+        name: string;
+        content: string;
+    } | null>(null);
+    const [fileError, setFileError] = useState<string | null>(null);
+    const [generationInputError, setGenerationInputError] = useState<
+        string | null
+    >(null);
 
     const form = useForm<QuizFormValues>({
         resolver: zodResolver(quizSchema),
@@ -132,7 +142,11 @@ export function CreateQuizForm() {
         error: aiGenerationError,
         stop: stopAiGeneration,
         clear: clearAiState,
-    } = useObject<typeof quizSchema, QuizFormValues, { prompt: string }>({
+    } = useObject<
+        typeof quizSchema,
+        QuizFormValues,
+        { prompt?: string; markdown?: string }
+    >({
         api: AI_GENERATION_ENDPOINT,
         schema: quizSchema,
         onFinish: ({ object }) => {
@@ -155,12 +169,19 @@ export function CreateQuizForm() {
     const handleGenerateQuiz = () => {
         const trimmedPrompt = prompt.trim();
 
-        if (!trimmedPrompt) {
+        if (!trimmedPrompt && !markdownFile) {
+            setGenerationInputError(
+                "Informe um prompt ou selecione um arquivo Markdown para gerar o quiz.",
+            );
             return;
         }
 
+        setGenerationInputError(null);
         clearAiState();
-        requestQuizGeneration({ prompt: trimmedPrompt });
+        requestQuizGeneration({
+            prompt: trimmedPrompt || undefined,
+            markdown: markdownFile?.content || undefined,
+        });
     };
 
     const handleSubmit = (values: QuizFormValues) => {
@@ -168,6 +189,69 @@ export function CreateQuizForm() {
 
         setPreview(normalizedQuiz);
         downloadQuizMarkdown(normalizedQuiz);
+    };
+
+    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            setMarkdownFile(null);
+            setFileError(null);
+            return;
+        }
+
+        if (file.size > MAX_MARKDOWN_FILE_SIZE) {
+            setMarkdownFile(null);
+            setFileError(
+                "O arquivo é muito grande. Selecione um arquivo de até 512 KB.",
+            );
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+            return;
+        }
+
+        const isMarkdown =
+            file.type === "text/markdown" ||
+            file.type === "text/plain" ||
+            file.name.toLowerCase().endsWith(".md") ||
+            file.name.toLowerCase().endsWith(".markdown");
+
+        if (!isMarkdown) {
+            setMarkdownFile(null);
+            setFileError("Use um arquivo .md ou .markdown.");
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setMarkdownFile({
+                name: file.name,
+                content: (reader.result as string) ?? "",
+            });
+            setFileError(null);
+            setGenerationInputError(null);
+        };
+        reader.onerror = () => {
+            setMarkdownFile(null);
+            setFileError("Não foi possível ler o arquivo. Tente novamente.");
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleRemoveFile = () => {
+        setMarkdownFile(null);
+        setFileError(null);
+        setGenerationInputError(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     };
 
     return (
@@ -185,7 +269,12 @@ export function CreateQuizForm() {
                 <CardContent className="space-y-4">
                     <Textarea
                         value={prompt}
-                        onChange={(event) => setPrompt(event.target.value)}
+                        onChange={(event) => {
+                            setPrompt(event.target.value);
+                            if (generationInputError) {
+                                setGenerationInputError(null);
+                            }
+                        }}
                         placeholder="Ex.: Crie um quiz avançado sobre JavaScript com 5 perguntas, 4 alternativas cada, indique a resposta correta e traga uma breve descrição."
                         className="min-h-32"
                     />
@@ -198,10 +287,50 @@ export function CreateQuizForm() {
                             </span>
                         </div>
                     )}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                            Arquivo Markdown (opcional)
+                        </label>
+                        <Input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".md,.markdown,text/markdown,text/plain"
+                            onChange={handleFileChange}
+                        />
+                        {markdownFile && (
+                            <div className="flex items-center justify-between rounded-md border bg-card p-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    <span className="font-medium">
+                                        {markdownFile.name}
+                                    </span>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleRemoveFile}
+                                >
+                                    <X className="mr-1 h-4 w-4" />
+                                    Remover
+                                </Button>
+                            </div>
+                        )}
+                        {fileError && (
+                            <p className="text-sm text-destructive">
+                                {fileError}
+                            </p>
+                        )}
+                    </div>
                     {aiGenerationError && (
                         <p className="text-sm text-destructive">
                             {aiGenerationError.message ||
                                 "Não foi possível gerar o quiz automaticamente."}
+                        </p>
+                    )}
+                    {generationInputError && (
+                        <p className="text-sm text-destructive">
+                            {generationInputError}
                         </p>
                     )}
                     <div className="flex items-center justify-end gap-2">
@@ -217,7 +346,10 @@ export function CreateQuizForm() {
                         <Button
                             type="button"
                             onClick={handleGenerateQuiz}
-                            disabled={!prompt.trim() || isGenerating}
+                            disabled={
+                                (prompt.trim().length === 0 && !markdownFile) ||
+                                isGenerating
+                            }
                         >
                             {isGenerating && (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

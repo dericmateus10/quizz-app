@@ -7,7 +7,8 @@ const openai = createOpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
-const DEFAULT_MODEL = "gpt-5-mini";
+const DEFAULT_MODEL = "gpt-4o-mini";
+const MAX_MARKDOWN_LENGTH = 20_000;
 
 const SYSTEM_PROMPT = `
 Você é um assistente que cria quizzes em português brasileiro.
@@ -43,11 +44,13 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => null);
     const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
+    const markdownRaw = typeof body?.markdown === "string" ? body.markdown : "";
+    const markdown = markdownRaw.trim();
 
-    if (!prompt) {
+    if (!prompt && !markdown) {
         return new Response(
             JSON.stringify({
-                error: "Informe um prompt válido para gerar o quiz.",
+                error: "Forneça um prompt de instrução ou envie um arquivo Markdown para gerar o quiz.",
             }),
             {
                 status: 400,
@@ -59,12 +62,37 @@ export async function POST(req: Request) {
     try {
         const modelId = process.env.OPENAI_MODEL || DEFAULT_MODEL;
 
+        const limitedMarkdown =
+            markdown.length > MAX_MARKDOWN_LENGTH
+                ? markdown.slice(0, MAX_MARKDOWN_LENGTH)
+                : markdown;
+
+        const promptSections: string[] = [];
+
+        if (prompt) {
+            promptSections.push(`Instruções do usuário:\n${prompt}`);
+        }
+
+        if (limitedMarkdown) {
+            let markdownSection = `Conteúdo base em Markdown:\n${limitedMarkdown}`;
+            if (markdown.length > MAX_MARKDOWN_LENGTH) {
+                markdownSection += `\n\n[Observação: conteúdo original truncado para ${MAX_MARKDOWN_LENGTH} caracteres.]`;
+            }
+            promptSections.push(markdownSection);
+        }
+
+        promptSections.push(
+            "Gere o quiz solicitado seguindo estritamente o schema fornecido e escrevendo o conteúdo em português do Brasil.",
+        );
+
+        const composedPrompt = promptSections.join("\n\n");
+
         const result = await streamObject({
             model: openai.responses(modelId),
             schema: quizSchema,
             mode: "json",
             system: SYSTEM_PROMPT,
-            prompt: `Instruções do usuário: ${prompt}`,
+            prompt: composedPrompt,
         });
 
         return result.toTextStreamResponse();

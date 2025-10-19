@@ -90,8 +90,9 @@ A tela de criação de quiz (`/quizzes/new`) conta com um prompt acima do formul
 - Usa o hook `useObject` do AI SDK para acompanhar o streaming da resposta.
 - Exibe um painel de progresso e uma pré-visualização parcial enquanto o modelo “pensa”.
 - Preenche automaticamente o formulário ao final, permitindo ajustes manuais e download do markdown.
+- Aceita um arquivo `.md` opcional de até 512 KB; o conteúdo serve como base para as perguntas geradas.
 
-O endpoint responsável (`/api/quizzes/generate`) utiliza `streamObject` com o modelo configurado via `OPENAI_MODEL`. Certifique-se de que sua organização OpenAI está verificada e que o modelo suporta streaming de objetos.
+O endpoint responsável (`/api/quizzes/generate`) utiliza `streamObject` com o modelo configurado via `OPENAI_MODEL`. Certifique-se de que sua organização OpenAI está verificada, que o modelo suporta streaming de objetos e que o arquivo enviado (quando houver) esteja dentro do limite suportado.
 
 ## Tailwind CSS
 
