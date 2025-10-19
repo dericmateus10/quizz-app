@@ -42,6 +42,54 @@ type QuizPreview = {
     }>;
 };
 
+const generateQuizMarkdown = (quiz: QuizPreview) => {
+    const lines: string[] = [`# ${quiz.title.trim() || "Quiz"}`];
+
+    if (quiz.description?.trim()) {
+        lines.push("", quiz.description.trim());
+    }
+
+    quiz.questions.forEach((question, index) => {
+        lines.push("", `## Pergunta ${index + 1}`, question.prompt.trim());
+
+        question.answers.forEach((answer) => {
+            const prefix = answer.isCorrect ? "- [x]" : "- [ ]";
+            lines.push(`${prefix} ${answer.text.trim()}`);
+        });
+    });
+
+    lines.push(
+        "",
+        "---",
+        "Arquivo gerado automaticamente pelo criador de quizzes.",
+    );
+
+    return lines.join("\n");
+};
+
+const downloadQuizMarkdown = (quiz: QuizPreview) => {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    const markdown = generateQuizMarkdown(quiz);
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const slug =
+        quiz.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "quiz";
+
+    link.href = url;
+    link.download = `${slug}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};
+
 export function CreateQuizForm() {
     const [preview, setPreview] = useState<QuizPreview | null>(null);
 
@@ -74,6 +122,7 @@ export function CreateQuizForm() {
         };
 
         setPreview(normalizedQuiz);
+        downloadQuizMarkdown(normalizedQuiz);
     };
 
     return (
@@ -88,8 +137,8 @@ export function CreateQuizForm() {
                         <CardHeader className="space-y-3">
                             <CardTitle>Informações do quiz</CardTitle>
                             <CardDescription>
-                                Defina título e descrição. Você pode editar estes
-                                dados depois.
+                                Defina título e descrição. Você pode editar
+                                estes dados depois.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -114,7 +163,9 @@ export function CreateQuizForm() {
                                 name="description"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Descrição (opcional)</FormLabel>
+                                        <FormLabel>
+                                            Descrição (opcional)
+                                        </FormLabel>
                                         <FormControl>
                                             <Textarea
                                                 placeholder="Explique o objetivo do quiz ou dê instruções rápidas."
@@ -134,7 +185,9 @@ export function CreateQuizForm() {
                                 key={question.id}
                                 form={form}
                                 questionIndex={questionIndex}
-                                onRemove={() => questionArray.remove(questionIndex)}
+                                onRemove={() =>
+                                    questionArray.remove(questionIndex)
+                                }
                                 canRemove={questionArray.fields.length > 1}
                             />
                         ))}
