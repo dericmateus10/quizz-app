@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useRef, useState } from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { FileText, Loader2, X } from "lucide-react";
+import { FileDown, FileText, Loader2, X } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 
@@ -119,6 +119,8 @@ export function CreateQuizForm() {
     const [generationInputError, setGenerationInputError] = useState<
         string | null
     >(null);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [pdfError, setPdfError] = useState<string | null>(null);
 
     const form = useForm<QuizFormValues>({
         resolver: zodResolver(quizSchema),
@@ -177,6 +179,7 @@ export function CreateQuizForm() {
         }
 
         setGenerationInputError(null);
+        setPdfError(null);
         clearAiState();
         requestQuizGeneration({
             prompt: trimmedPrompt || undefined,
@@ -189,6 +192,7 @@ export function CreateQuizForm() {
 
         setPreview(normalizedQuiz);
         downloadQuizMarkdown(normalizedQuiz);
+        setPdfError(null);
     };
 
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -234,6 +238,7 @@ export function CreateQuizForm() {
             });
             setFileError(null);
             setGenerationInputError(null);
+            setPdfError(null);
         };
         reader.onerror = () => {
             setMarkdownFile(null);
@@ -249,8 +254,73 @@ export function CreateQuizForm() {
         setMarkdownFile(null);
         setFileError(null);
         setGenerationInputError(null);
+        setPdfError(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
+        }
+    };
+
+    const handleExportPdf = async () => {
+        const isValid = await form.trigger();
+
+        if (!isValid) {
+            setPdfError(
+                "Corrija os erros do formulário antes de exportar o PDF.",
+            );
+            return;
+        }
+
+        const values = form.getValues();
+
+        try {
+            setPdfError(null);
+            setIsExportingPdf(true);
+
+            const response = await fetch("/api/quizzes/export", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(values),
+            });
+
+            if (!response.ok) {
+                let message = "Não foi possível gerar o PDF.";
+                try {
+                    const data = await response.json();
+                    if (data?.error) {
+                        message = data.error;
+                    }
+                } catch (error) {
+                    // ignore parsing errors
+                }
+                throw new Error(message);
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const slug =
+                values.title
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-+|-+$/g, "") || "quiz";
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${slug}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            setPdfError(
+                error instanceof Error
+                    ? error.message
+                    : "Não foi possível gerar o PDF.",
+            );
+        } finally {
+            setIsExportingPdf(false);
         }
     };
 
@@ -438,9 +508,27 @@ export function CreateQuizForm() {
                         </div>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleExportPdf}
+                            disabled={isExportingPdf}
+                        >
+                            {isExportingPdf ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <FileDown className="mr-2 h-4 w-4" />
+                            )}
+                            Exportar PDF
+                        </Button>
                         <Button type="submit">Salvar quiz</Button>
                     </div>
+                    {pdfError && (
+                        <p className="text-right text-sm text-destructive">
+                            {pdfError}
+                        </p>
+                    )}
                 </form>
             </Form>
 

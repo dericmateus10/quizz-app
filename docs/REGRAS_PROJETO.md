@@ -51,6 +51,7 @@ Documento vivo com orientações para desenvolvimento colaborativo do Quizz App.
 - Atualize o README e demais arquivos em `docs/` sempre que novas funcionalidades, decisões arquiteturais ou processos forem definidos.
 - Mantenha changelog ou release notes quando as versões começarem a ser cortadas.
 - Registre instruções de uso de recursos assistidos por IA (prompt, streaming, limitações de modelo) sempre que a experiência mudar.
+- Documente fluxos de exportação (Markdown, PDF, etc.) para que a equipe saiba como orientar alunos e usuários finais.
 
 ## Dúvidas
 
