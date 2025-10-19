@@ -44,11 +44,13 @@ Documento vivo com orientações para desenvolvimento colaborativo do Quizz App.
 - Jamais faça commit de chaves, senhas ou dados sensíveis. Use variáveis de ambiente e `.env.local`, nunca commitado.
 - Revise permissões de bibliotecas externas e avalie licenças antes de adicionar novas dependências.
 - Garanta que novas rotas ou APIs façam validação de entrada e tratem erros de forma controlada.
+- Para integrações com IA, mantenha modelos e chaves configuráveis via `.env.local` (`OPENAI_API_KEY`, `OPENAI_MODEL`) e documente mudanças relevantes.
 
 ## Documentação
 
 - Atualize o README e demais arquivos em `docs/` sempre que novas funcionalidades, decisões arquiteturais ou processos forem definidos.
 - Mantenha changelog ou release notes quando as versões começarem a ser cortadas.
+- Registre instruções de uso de recursos assistidos por IA (prompt, streaming, limitações de modelo) sempre que a experiência mudar.
 
 ## Dúvidas
 

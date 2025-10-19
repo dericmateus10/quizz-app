@@ -189,6 +189,15 @@ export function CreateQuizForm() {
                         placeholder="Ex.: Crie um quiz avançado sobre JavaScript com 5 perguntas, 4 alternativas cada, indique a resposta correta e traga uma breve descrição."
                         className="min-h-32"
                     />
+                    {isGenerating && (
+                        <div className="flex items-center gap-2 rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>
+                                A IA está analisando o prompt e montando o
+                                quiz...
+                            </span>
+                        </div>
+                    )}
                     {aiGenerationError && (
                         <p className="text-sm text-destructive">
                             {aiGenerationError.message ||

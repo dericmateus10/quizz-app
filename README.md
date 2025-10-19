@@ -28,6 +28,21 @@ Outros scripts úteis:
 
 > Caso prefira npm, ajuste os comandos (`npm install`, `npm run dev`, etc.). Use apenas um gerenciador de pacotes por vez para evitar conflitos de lockfile.
 
+### Variáveis de ambiente
+
+Crie um arquivo `.env.local` na raiz do projeto com:
+
+```bash
+OPENAI_API_KEY=...
+# Opcional: sobrescreve o modelo padrão (gpt-4o-mini)
+OPENAI_MODEL=gpt-4o-mini
+```
+
+- `OPENAI_API_KEY`: chave pessoal da OpenAI com permissão para usar o modelo desejado (Responses API com streaming).
+- `OPENAI_MODEL` (opcional): informe outro modelo compatível com streaming caso queira alterar o padrão. Se o modelo não suportar streaming, a aplicação exibirá um erro orientando o ajuste.
+
+Após alterar o `.env.local`, reinicie o servidor de desenvolvimento.
+
 ## Estrutura do projeto
 
 ```
@@ -42,6 +57,9 @@ src/
           question-fields.tsx   # bloco reutilizável de perguntas e alternativas
         schema.ts               # esquemas Zod e defaults do formulário
         page.tsx                # rota que orquestra o formulário e layout
+    api/
+      quizzes/
+        generate/route.ts       # endpoint que usa AI SDK + OpenAI para gerar quizzes via streaming
     docs/
       regras/
         page.tsx   # exibe docs/REGRAS_PROJETO.md na aplicação
@@ -64,6 +82,16 @@ public/
 2. Implemente novas telas ou lógicas em componentes desacoplados e reutilizáveis.
 3. Documente comportamentos relevantes no README ou em arquivos específicos em `docs/`.
 4. Execute os scripts de verificação antes de abrir merge requests. No momento, priorize `pnpm build` para garantir que o projeto continua compilando.
+
+## Geração de quizzes com IA
+
+A tela de criação de quiz (`/quizzes/new`) conta com um prompt acima do formulário. Ao enviar instruções, a aplicação:
+
+- Usa o hook `useObject` do AI SDK para acompanhar o streaming da resposta.
+- Exibe um painel de progresso e uma pré-visualização parcial enquanto o modelo “pensa”.
+- Preenche automaticamente o formulário ao final, permitindo ajustes manuais e download do markdown.
+
+O endpoint responsável (`/api/quizzes/generate`) utiliza `streamObject` com o modelo configurado via `OPENAI_MODEL`. Certifique-se de que sua organização OpenAI está verificada e que o modelo suporta streaming de objetos.
 
 ## Tailwind CSS
 
