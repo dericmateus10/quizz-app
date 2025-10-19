@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { experimental_useObject as useObject } from "@ai-sdk/react";
+import { Loader2 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 
@@ -41,6 +43,20 @@ type QuizPreview = {
         }>;
     }>;
 };
+
+const AI_GENERATION_ENDPOINT = "/api/quizzes/generate";
+
+const quizValuesToPreview = (values: QuizFormValues): QuizPreview => ({
+    title: values.title,
+    description: values.description,
+    questions: values.questions.map((question) => ({
+        prompt: question.prompt,
+        answers: question.answers.map((answer, index) => ({
+            text: answer.text,
+            isCorrect: index === question.correctAnswer,
+        })),
+    })),
+});
 
 const generateQuizMarkdown = (quiz: QuizPreview) => {
     const lines: string[] = [`# ${quiz.title.trim() || "Quiz"}`];
@@ -91,6 +107,7 @@ const downloadQuizMarkdown = (quiz: QuizPreview) => {
 };
 
 export function CreateQuizForm() {
+    const [prompt, setPrompt] = useState("");
     const [preview, setPreview] = useState<QuizPreview | null>(null);
 
     const form = useForm<QuizFormValues>({
@@ -108,18 +125,46 @@ export function CreateQuizForm() {
         name: "questions",
     });
 
+    const {
+        object: aiQuiz,
+        submit: requestQuizGeneration,
+        isLoading: isGenerating,
+        error: aiGenerationError,
+        stop: stopAiGeneration,
+        clear: clearAiState,
+    } = useObject<typeof quizSchema, QuizFormValues, { prompt: string }>({
+        api: AI_GENERATION_ENDPOINT,
+        schema: quizSchema,
+        onFinish: ({ object }) => {
+            if (!object) {
+                return;
+            }
+
+            form.reset(object);
+            questionArray.replace(object.questions);
+            form.clearErrors();
+            setPreview(quizValuesToPreview(object));
+        },
+    });
+
+    const aiPreviewJson =
+        aiQuiz && Object.keys(aiQuiz).length > 0
+            ? JSON.stringify(aiQuiz, null, 2)
+            : null;
+
+    const handleGenerateQuiz = () => {
+        const trimmedPrompt = prompt.trim();
+
+        if (!trimmedPrompt) {
+            return;
+        }
+
+        clearAiState();
+        requestQuizGeneration({ prompt: trimmedPrompt });
+    };
+
     const handleSubmit = (values: QuizFormValues) => {
-        const normalizedQuiz: QuizPreview = {
-            title: values.title,
-            description: values.description,
-            questions: values.questions.map((question) => ({
-                prompt: question.prompt,
-                answers: question.answers.map((answer, index) => ({
-                    text: answer.text,
-                    isCorrect: index === question.correctAnswer,
-                })),
-            })),
-        };
+        const normalizedQuiz = quizValuesToPreview(values);
 
         setPreview(normalizedQuiz);
         downloadQuizMarkdown(normalizedQuiz);
@@ -127,6 +172,53 @@ export function CreateQuizForm() {
 
     return (
         <div className="grid gap-6">
+            <Card>
+                <CardHeader className="space-y-3">
+                    <CardTitle>Gerar quiz com IA</CardTitle>
+                    <CardDescription>
+                        Escreva um prompt descrevendo tema, nível de
+                        dificuldade, quantidade de perguntas e alternativas
+                        desejadas. A IA vai preencher o formulário
+                        automaticamente.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Textarea
+                        value={prompt}
+                        onChange={(event) => setPrompt(event.target.value)}
+                        placeholder="Ex.: Crie um quiz avançado sobre JavaScript com 5 perguntas, 4 alternativas cada, indique a resposta correta e traga uma breve descrição."
+                        className="min-h-32"
+                    />
+                    {aiGenerationError && (
+                        <p className="text-sm text-destructive">
+                            {aiGenerationError.message ||
+                                "Não foi possível gerar o quiz automaticamente."}
+                        </p>
+                    )}
+                    <div className="flex items-center justify-end gap-2">
+                        {isGenerating && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => stopAiGeneration()}
+                            >
+                                Cancelar
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            onClick={handleGenerateQuiz}
+                            disabled={!prompt.trim() || isGenerating}
+                        >
+                            {isGenerating && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            Gerar com IA
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             <Form {...form}>
                 <form
                     className="grid gap-6"
@@ -210,6 +302,22 @@ export function CreateQuizForm() {
                     </div>
                 </form>
             </Form>
+
+            {aiPreviewJson && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Pré-visualização em tempo real</CardTitle>
+                        <CardDescription>
+                            Dados recebidos da IA enquanto o quiz é gerado.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <pre className="bg-muted text-muted-foreground/80 max-h-64 overflow-auto rounded-md p-4 text-sm">
+                            {aiPreviewJson}
+                        </pre>
+                    </CardContent>
+                </Card>
+            )}
 
             {preview && (
                 <Card>
