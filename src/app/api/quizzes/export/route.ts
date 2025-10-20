@@ -129,6 +129,60 @@ export async function POST(req: Request) {
             );
 
         quiz.questions.forEach((question, questionIndex) => {
+            const imageBuffer =
+                question.image?.dataUrl &&
+                dataUrlToBuffer(question.image.dataUrl);
+
+            const maxWidth =
+                doc.page.width - doc.page.margins.left - doc.page.margins.right;
+            const availableHeight = doc.page.height - doc.page.margins.bottom;
+
+            let imageMetadata: {
+                width: number;
+                height: number;
+                x: number;
+            } | null = null;
+
+            if (imageBuffer) {
+                try {
+                    const baseImage = (
+                        doc as unknown as {
+                            openImage: (src: Buffer) => {
+                                width: number;
+                                height: number;
+                            };
+                        }
+                    ).openImage(imageBuffer);
+                    const maxHeight = 240;
+                    const widthScale = maxWidth / baseImage.width;
+                    const heightScale = maxHeight / baseImage.height;
+                    const scale = Math.min(1, widthScale, heightScale);
+                    const drawWidth = baseImage.width * scale;
+                    const drawHeight = baseImage.height * scale;
+                    const x =
+                        doc.page.margins.left + (maxWidth - drawWidth) / 2;
+
+                    imageMetadata = {
+                        width: drawWidth,
+                        height: drawHeight,
+                        x,
+                    };
+                } catch (error) {
+                    console.error("Quiz PDF image metadata error:", error);
+                }
+            }
+
+            const estimatedHeight =
+                70 +
+                question.answers.length * 24 +
+                (imageMetadata ? imageMetadata.height + 30 : 0) +
+                26;
+
+            if (doc.y + estimatedHeight > availableHeight) {
+                doc.addPage({ margin: doc.page.margins.left });
+                doc.font("QuizRegular");
+            }
+
             doc.moveDown(1.2);
             doc.font("QuizBold")
                 .fontSize(14)
@@ -150,32 +204,28 @@ export async function POST(req: Request) {
                 );
             });
 
-            const imageBuffer =
-                question.image?.dataUrl &&
-                dataUrlToBuffer(question.image.dataUrl);
-
-            if (imageBuffer) {
-                doc.moveDown(0.6);
+            if (imageBuffer && imageMetadata) {
                 try {
-                    doc.image(imageBuffer, {
-                        fit: [420, 240],
-                        align: "center",
+                    const currentAvailableHeight =
+                        doc.page.height - doc.page.margins.bottom;
+                    if (
+                        doc.y + imageMetadata.height + 20 >
+                        currentAvailableHeight
+                    ) {
+                        doc.addPage({ margin: doc.page.margins.left });
+                        doc.font("QuizRegular");
+                    }
+
+                    doc.moveDown(0.6);
+                    const startY = doc.y;
+                    doc.image(imageBuffer, imageMetadata.x, startY, {
+                        width: imageMetadata.width,
                     });
+                    doc.y = startY + imageMetadata.height;
+                    doc.moveDown(0.6);
                 } catch (error) {
                     console.error("Quiz PDF image render error:", error);
                 }
-            }
-
-            if (question.imageHint?.trim()) {
-                doc.moveDown(0.4);
-                doc.font("QuizRegular")
-                    .fontSize(11)
-                    .text(
-                        `Sugestão de imagem: ${sanitizeText(question.imageHint)}`,
-                        {
-                            align: "left",
-                        },
-                    );
             }
 
             doc.moveDown(0.7);
