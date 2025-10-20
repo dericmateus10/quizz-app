@@ -21,6 +21,19 @@ const slugify = (value: string) =>
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "") || "quiz";
 
+const sanitizeText = (value: string) =>
+    value
+        .normalize("NFKC")
+        .replace(/[\u2190-\u21FF\u27A1\u2794\u279C\u27BD\u27F5-\u27FF]/g, "->")
+        .replace(/\u2022/g, "-")
+        .replace(
+            // remove emojis / pictographs
+            /[\p{Extended_Pictographic}\p{Emoji_Presentation}]/gu,
+            "",
+        )
+        .replace(/\s+/g, " ")
+        .trim();
+
 export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const parsed = quizSchema.safeParse(body);
@@ -77,15 +90,17 @@ export async function POST(req: Request) {
 
         doc.font("QuizBold")
             .fontSize(20)
-            .text(quiz.title || "Quiz", {
+            .text(sanitizeText(quiz.title || "Quiz"), {
                 align: "center",
             });
 
         if (quiz.description?.trim()) {
             doc.moveDown();
-            doc.font("QuizRegular").fontSize(12).text(quiz.description.trim(), {
-                align: "center",
-            });
+            doc.font("QuizRegular")
+                .fontSize(12)
+                .text(sanitizeText(quiz.description.trim()), {
+                    align: "center",
+                });
         }
 
         doc.moveDown(1);
@@ -107,14 +122,19 @@ export async function POST(req: Request) {
                 .text(`Questão ${questionIndex + 1}`);
 
             doc.moveDown(0.35);
-            doc.font("QuizRegular").fontSize(12).text(question.prompt);
+            doc.font("QuizRegular")
+                .fontSize(12)
+                .text(sanitizeText(question.prompt));
 
             doc.moveDown(0.5);
             question.answers.forEach((answer, answerIndex) => {
                 const letter = String.fromCharCode(65 + answerIndex);
-                doc.font("QuizRegular").text(`${letter}) ${answer.text}`, {
-                    indent: 16,
-                });
+                doc.font("QuizRegular").text(
+                    `${letter}) ${sanitizeText(answer.text)}`,
+                    {
+                        indent: 16,
+                    },
+                );
             });
 
             doc.moveDown(0.7);
