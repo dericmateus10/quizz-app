@@ -94,6 +94,7 @@ A tela de criação de quiz (`/quizzes/new`) conta com um prompt acima do formul
 - Aceita um arquivo `.md` opcional de até 512 KB; o conteúdo serve como base para as perguntas geradas.
 - Exporta o quiz preenchido para PDF (botão “Exportar PDF”), ideal para aplicações como provas objetivas impressas.
 - Sugere, para cada pergunta, uma imagem relevante via campo `imageHint` e permite anexar arquivos (PNG/JPG/GIF/WEBP até 2 MB) diretamente no formulário.
+- Cada pergunta possui campos distintos de contexto (enunciado inicial) e comando, facilitando instruções mais claras para o aluno.
 
 O endpoint responsável (`/api/quizzes/generate`) utiliza `streamObject` com o modelo configurado via `OPENAI_MODEL`. Certifique-se de que sua organização OpenAI está verificada, que o modelo suporta streaming de objetos e que o arquivo enviado (quando houver) esteja dentro do limite suportado.
 

@@ -188,10 +188,17 @@ export async function POST(req: Request) {
                 .fontSize(14)
                 .text(`Questão ${questionIndex + 1}`);
 
+            if (question.context?.trim()) {
+                doc.moveDown(0.35);
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(sanitizeText(question.context));
+            }
+
             doc.moveDown(0.35);
-            doc.font("QuizRegular")
+            doc.font("QuizBold")
                 .fontSize(12)
-                .text(sanitizeText(question.prompt));
+                .text(sanitizeText(question.command));
 
             doc.moveDown(0.5);
             question.answers.forEach((answer, answerIndex) => {

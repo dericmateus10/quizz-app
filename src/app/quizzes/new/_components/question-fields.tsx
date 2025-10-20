@@ -163,13 +163,34 @@ export function QuestionFields({
             <CardContent className="space-y-5">
                 <FormField
                     control={form.control}
-                    name={`questions.${questionIndex}.prompt`}
+                    name={`questions.${questionIndex}.context`}
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Enunciado</FormLabel>
+                            <FormLabel>Contexto (enunciado)</FormLabel>
                             <FormControl>
                                 <Textarea
-                                    placeholder="Digite a pergunta que será apresentada aos participantes."
+                                    placeholder="Descreva o cenário, texto de apoio ou dados que introduzem a questão."
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                            <p className="text-muted-foreground/80 mt-1 text-xs">
+                                Opcional. Deixe em branco se a pergunta não
+                                precisar de contexto.
+                            </p>
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name={`questions.${questionIndex}.command`}
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Comando</FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    placeholder="Declare o que o aluno deve responder ou selecionar."
                                     {...field}
                                 />
                             </FormControl>

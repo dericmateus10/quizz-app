@@ -25,7 +25,8 @@ export const answerSchema = z.object({
 
 export const questionSchema = z
     .object({
-        prompt: z.string().min(1, "Informe o enunciado da pergunta"),
+        context: z.string().max(1500, "Contexto muito longo").optional(),
+        command: z.string().min(1, "Informe o comando da pergunta"),
         answers: z
             .array(answerSchema)
             .min(2, "Adicione pelo menos duas alternativas"),
@@ -52,11 +53,12 @@ export const quizSchema = z.object({
     questions: z.array(questionSchema).min(1, "Crie pelo menos uma pergunta"),
 });
 
-export type QuizFormValues = z.infer<typeof quizSchema>;
-export type QuestionFormValues = z.infer<typeof questionSchema>;
+export type QuizFormValues = z.input<typeof quizSchema>;
+export type QuestionFormValues = z.input<typeof questionSchema>;
 
 export const createEmptyQuestion = (): QuestionFormValues => ({
-    prompt: "",
+    context: "",
+    command: "",
     answers: [{ text: "" }, { text: "" }],
     correctAnswer: -1,
     imageHint: "",

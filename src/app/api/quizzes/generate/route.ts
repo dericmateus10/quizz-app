@@ -16,7 +16,8 @@ Sempre retorne um JSON que siga rigorosamente o schema com as propriedades:
 - title: título do quiz (string).
 - description: descrição curta opcional (string).
 - questions: array com perguntas. Cada pergunta deve ter:
-  - prompt: enunciado da pergunta (string).
+  - context: contexto ou enunciado introdutório (string, pode ser vazio quando não houver necessidade).
+  - command: instrução direta ao aluno sobre o que responder (string).
   - answers: array de alternativas com pelo menos 2 itens. Cada alternativa possui:
     - text: texto da alternativa (string).
   - correctAnswer: índice (base 0) da alternativa correta dentro do array "answers".
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
         }
 
         promptSections.push(
-            "Gere o quiz solicitado seguindo estritamente o schema fornecido e escrevendo o conteúdo em português do Brasil. Inclua sugestões claras em 'imageHint' para cada pergunta, deixando vazio apenas quando nenhuma imagem fizer sentido.",
+            "Gere o quiz solicitado seguindo estritamente o schema fornecido e escrevendo o conteúdo em português do Brasil. Separe contexto e comando: use 'context' para texto introdutório (deixe vazio se não precisar) e 'command' para a instrução que o aluno deve responder. Inclua sugestões claras em 'imageHint' para cada pergunta, deixando vazio apenas quando nenhuma imagem fizer sentido.",
         );
 
         const composedPrompt = promptSections.join("\n\n");

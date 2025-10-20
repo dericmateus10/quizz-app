@@ -36,7 +36,8 @@ type QuizPreview = {
     title: string;
     description?: string;
     questions: Array<{
-        prompt: string;
+        context?: string;
+        command: string;
         answers: Array<{
             text: string;
             isCorrect: boolean;
@@ -57,7 +58,8 @@ const quizValuesToPreview = (values: QuizFormValues): QuizPreview => ({
     title: values.title,
     description: values.description,
     questions: values.questions.map((question) => ({
-        prompt: question.prompt,
+        context: question.context?.trim() ? question.context : undefined,
+        command: question.command,
         answers: question.answers.map((answer, index) => ({
             text: answer.text,
             isCorrect: index === question.correctAnswer,
@@ -81,7 +83,13 @@ const generateQuizMarkdown = (quiz: QuizPreview) => {
     }
 
     quiz.questions.forEach((question, index) => {
-        lines.push("", `## Pergunta ${index + 1}`, question.prompt.trim());
+        lines.push("", `## Pergunta ${index + 1}`);
+
+        if (question.context?.trim()) {
+            lines.push(question.context.trim());
+        }
+
+        lines.push(question.command.trim());
 
         question.answers.forEach((answer) => {
             const prefix = answer.isCorrect ? "- [x]" : "- [ ]";
@@ -180,10 +188,18 @@ export function CreateQuizForm() {
                 return;
             }
 
-            form.reset(object);
-            questionArray.replace(object.questions);
+            const normalizedObject: QuizFormValues = {
+                ...object,
+                questions: object.questions.map((question) => ({
+                    ...question,
+                    context: question.context ?? "",
+                })),
+            };
+
+            form.reset(normalizedObject);
+            questionArray.replace(normalizedObject.questions);
             form.clearErrors();
-            setPreview(quizValuesToPreview(object));
+            setPreview(quizValuesToPreview(normalizedObject));
         },
     });
 
