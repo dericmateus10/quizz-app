@@ -1,5 +1,8 @@
 "use client";
 
+import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { Image as ImageIcon, Trash2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -20,7 +23,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useFieldArray, type UseFormReturn } from "react-hook-form";
 
-import type { QuizFormValues } from "../schema";
+import { MAX_QUESTION_IMAGE_SIZE, type QuizFormValues } from "../schema";
 
 type QuestionFieldsProps = {
     form: UseFormReturn<QuizFormValues>;
@@ -40,6 +43,11 @@ export function QuestionFields({
         name: `questions.${questionIndex}.answers`,
     });
 
+    const [imageError, setImageError] = useState<string | null>(null);
+    const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+    const image = form.watch(`questions.${questionIndex}.image`);
+
     const removeAnswer = (answerIndex: number) => {
         answerArray.remove(answerIndex);
         const selected = form.getValues(
@@ -58,6 +66,79 @@ export function QuestionFields({
             );
         }
     };
+
+    const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            form.setValue(`questions.${questionIndex}.image`, undefined, {
+                shouldDirty: true,
+            });
+            setImageError(null);
+            return;
+        }
+
+        if (!file.type.startsWith("image/")) {
+            setImageError("Envie apenas arquivos de imagem (PNG, JPG, etc.).");
+            if (imageInputRef.current) {
+                imageInputRef.current.value = "";
+            }
+            return;
+        }
+
+        if (file.size > MAX_QUESTION_IMAGE_SIZE) {
+            setImageError(
+                `Imagem muito grande. Limite de ${(MAX_QUESTION_IMAGE_SIZE / (1024 * 1024)).toFixed(1)} MB.`,
+            );
+            if (imageInputRef.current) {
+                imageInputRef.current.value = "";
+            }
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = reader.result as string;
+            form.setValue(
+                `questions.${questionIndex}.image`,
+                {
+                    name: file.name,
+                    dataUrl,
+                    size: file.size,
+                    type: file.type,
+                },
+                { shouldDirty: true },
+            );
+            setImageError(null);
+        };
+        reader.onerror = () => {
+            setImageError("Não foi possível ler o arquivo. Tente novamente.");
+            if (imageInputRef.current) {
+                imageInputRef.current.value = "";
+            }
+        };
+
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveImage = () => {
+        form.setValue(`questions.${questionIndex}.image`, undefined, {
+            shouldDirty: true,
+        });
+        if (imageInputRef.current) {
+            imageInputRef.current.value = "";
+        }
+        setImageError(null);
+    };
+
+    useEffect(() => {
+        if (!image) {
+            setImageError(null);
+            if (imageInputRef.current) {
+                imageInputRef.current.value = "";
+            }
+        }
+    }, [image]);
 
     return (
         <Card>
@@ -96,6 +177,79 @@ export function QuestionFields({
                         </FormItem>
                     )}
                 />
+
+                <FormField
+                    control={form.control}
+                    name={`questions.${questionIndex}.imageHint`}
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>
+                                Sugestão de imagem (gerada pela IA)
+                            </FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    placeholder="Ex.: Foto de um diagrama da pirâmide do conhecimento."
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                            <p className="text-muted-foreground/80 mt-1 text-xs">
+                                Use este texto como referência para anexar uma
+                                imagem que complemente a pergunta.
+                            </p>
+                        </FormItem>
+                    )}
+                />
+
+                <div className="space-y-3">
+                    <FormLabel>Imagem da pergunta (opcional)</FormLabel>
+                    <Input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif,image/webp"
+                        onChange={handleImageChange}
+                    />
+                    <p className="text-muted-foreground text-xs">
+                        Formatos suportados: PNG, JPG, GIF, WEBP. Tamanho
+                        máximo:{" "}
+                        {(MAX_QUESTION_IMAGE_SIZE / (1024 * 1024)).toFixed(1)}
+                        MB.
+                    </p>
+                    {imageError && (
+                        <p className="text-sm text-destructive">{imageError}</p>
+                    )}
+                    {image && (
+                        <div className="flex items-start gap-3 rounded-md border bg-muted/40 p-3">
+                            <div className="flex items-center justify-center overflow-hidden rounded-md border bg-background">
+                                <img
+                                    src={image.dataUrl}
+                                    alt={image.name}
+                                    className="h-24 w-24 object-cover"
+                                />
+                            </div>
+                            <div className="flex-1 space-y-1 text-sm">
+                                <p className="font-medium flex items-center gap-1">
+                                    <ImageIcon className="h-4 w-4" />
+                                    {image.name}
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                    {(image.size / 1024).toFixed(0)} KB ·{" "}
+                                    {image.type}
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={handleRemoveImage}
+                                >
+                                    <Trash2 className="mr-1 h-4 w-4" />
+                                    Remover imagem
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 <FormField
                     control={form.control}
@@ -181,7 +335,9 @@ export function QuestionFields({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => answerArray.append({ text: "" })}
+                                    onClick={() =>
+                                        answerArray.append({ text: "" })
+                                    }
                                 >
                                     Nova alternativa
                                 </Button>

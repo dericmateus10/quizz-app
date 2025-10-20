@@ -20,13 +20,15 @@ Sempre retorne um JSON que siga rigorosamente o schema com as propriedades:
   - answers: array de alternativas com pelo menos 2 itens. Cada alternativa possui:
     - text: texto da alternativa (string).
   - correctAnswer: índice (base 0) da alternativa correta dentro do array "answers".
+  - imageHint: texto curto sugerindo uma imagem relevante (string, pode ser vazio quando não fizer sentido).
 
 Regras:
 - Mantenha coerência com o tema solicitado pelo usuário.
 - Garanta que o índice "correctAnswer" corresponda exatamente à alternativa correta.
 - As alternativas devem ser concisas e exclusivas entre si.
 - Prefira produzir entre 3 e 6 perguntas, a menos que o usuário peça outra quantidade.
-- Não inclua explicações fora do JSON.
+ - Não inclua explicações fora do JSON.
+ - Para cada pergunta, sugira uma imagem em "imageHint" que ajude o aluno na visualização do problema.
 `.trim();
 
 export async function POST(req: Request) {
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
         }
 
         promptSections.push(
-            "Gere o quiz solicitado seguindo estritamente o schema fornecido e escrevendo o conteúdo em português do Brasil.",
+            "Gere o quiz solicitado seguindo estritamente o schema fornecido e escrevendo o conteúdo em português do Brasil. Inclua sugestões claras em 'imageHint' para cada pergunta, deixando vazio apenas quando nenhuma imagem fizer sentido.",
         );
 
         const composedPrompt = promptSections.join("\n\n");

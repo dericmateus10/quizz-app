@@ -93,11 +93,12 @@ A tela de criação de quiz (`/quizzes/new`) conta com um prompt acima do formul
 - Preenche automaticamente o formulário ao final, permitindo ajustes manuais e download do markdown.
 - Aceita um arquivo `.md` opcional de até 512 KB; o conteúdo serve como base para as perguntas geradas.
 - Exporta o quiz preenchido para PDF (botão “Exportar PDF”), ideal para aplicações como provas objetivas impressas.
+- Sugere, para cada pergunta, uma imagem relevante via campo `imageHint` e permite anexar arquivos (PNG/JPG/GIF/WEBP até 2 MB) diretamente no formulário.
 
 O endpoint responsável (`/api/quizzes/generate`) utiliza `streamObject` com o modelo configurado via `OPENAI_MODEL`. Certifique-se de que sua organização OpenAI está verificada, que o modelo suporta streaming de objetos e que o arquivo enviado (quando houver) esteja dentro do limite suportado.
 
-Para exportar o PDF, a aplicação chama `/api/quizzes/export`, que valida os dados do formulário e monta um documento A4 com título, descrição, perguntas numeradas, alternativas (A-D, etc.) e espaço para a resposta do aluno.
-Os arquivos de fonte usados nessa geração estão em `public/fonts` (Roboto Regular/Bold); mantenha-os versionados para evitar erros de fonte ausente em ambientes novos.
+Para exportar o PDF, a aplicação chama `/api/quizzes/export`, que valida os dados do formulário e monta um documento A4 com título, descrição, perguntas numeradas, alternativas (A-D, etc.), espaço para respostas e (quando houver) imagens anexadas e sugestões.
+Os arquivos de fonte usados na geração (`public/fonts/Roboto-Regular.ttf` e `public/fonts/Roboto-Bold.ttf`) já estão versionados; mantenha-os no repositório para evitar erros de font no PDF.
 
 ## Tailwind CSS
 

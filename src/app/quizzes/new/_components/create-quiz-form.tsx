@@ -41,6 +41,12 @@ type QuizPreview = {
             text: string;
             isCorrect: boolean;
         }>;
+        imageHint?: string;
+        image?: {
+            name: string;
+            size: number;
+            type: string;
+        };
     }>;
 };
 
@@ -56,6 +62,14 @@ const quizValuesToPreview = (values: QuizFormValues): QuizPreview => ({
             text: answer.text,
             isCorrect: index === question.correctAnswer,
         })),
+        imageHint: question.imageHint?.trim() ? question.imageHint : undefined,
+        image: question.image
+            ? {
+                  name: question.image.name,
+                  size: question.image.size,
+                  type: question.image.type,
+              }
+            : undefined,
     })),
 });
 
@@ -73,6 +87,16 @@ const generateQuizMarkdown = (quiz: QuizPreview) => {
             const prefix = answer.isCorrect ? "- [x]" : "- [ ]";
             lines.push(`${prefix} ${answer.text.trim()}`);
         });
+
+        if (question.imageHint?.trim()) {
+            lines.push("", `Sugestão de imagem: ${question.imageHint.trim()}`);
+        }
+
+        if (question.image) {
+            lines.push(
+                `Imagem anexada: ${question.image.name} (${question.image.type}, ${(question.image.size / 1024).toFixed(0)} KB)`,
+            );
+        }
     });
 
     lines.push(

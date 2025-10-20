@@ -34,6 +34,19 @@ const sanitizeText = (value: string) =>
         .replace(/\s+/g, " ")
         .trim();
 
+const dataUrlToBuffer = (dataUrl: string) => {
+    const match = dataUrl.match(/^data:(.+);base64,(.+)$/);
+    if (!match) {
+        return null;
+    }
+
+    try {
+        return Buffer.from(match[2], "base64");
+    } catch {
+        return null;
+    }
+};
+
 export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const parsed = quizSchema.safeParse(body);
@@ -136,6 +149,34 @@ export async function POST(req: Request) {
                     },
                 );
             });
+
+            const imageBuffer =
+                question.image?.dataUrl &&
+                dataUrlToBuffer(question.image.dataUrl);
+
+            if (imageBuffer) {
+                doc.moveDown(0.6);
+                try {
+                    doc.image(imageBuffer, {
+                        fit: [420, 240],
+                        align: "center",
+                    });
+                } catch (error) {
+                    console.error("Quiz PDF image render error:", error);
+                }
+            }
+
+            if (question.imageHint?.trim()) {
+                doc.moveDown(0.4);
+                doc.font("QuizRegular")
+                    .fontSize(11)
+                    .text(
+                        `Sugestão de imagem: ${sanitizeText(question.imageHint)}`,
+                        {
+                            align: "left",
+                        },
+                    );
+            }
 
             doc.moveDown(0.7);
             doc.font("QuizRegular").text(
