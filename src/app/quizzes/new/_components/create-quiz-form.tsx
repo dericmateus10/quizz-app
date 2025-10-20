@@ -86,10 +86,10 @@ const generateQuizMarkdown = (quiz: QuizPreview) => {
         lines.push("", `## Pergunta ${index + 1}`);
 
         if (question.context?.trim()) {
-            lines.push(question.context.trim());
+            lines.push(`Contexto: ${question.context.trim()}`);
         }
 
-        lines.push(question.command.trim());
+        lines.push(`Comando: ${question.command.trim()}`);
 
         question.answers.forEach((answer) => {
             const prefix = answer.isCorrect ? "- [x]" : "- [ ]";

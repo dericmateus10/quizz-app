@@ -175,6 +175,7 @@ export async function POST(req: Request) {
             const estimatedHeight =
                 70 +
                 question.answers.length * 24 +
+                (question.context?.trim() ? 40 : 0) +
                 (imageMetadata ? imageMetadata.height + 30 : 0) +
                 26;
 
@@ -190,15 +191,21 @@ export async function POST(req: Request) {
 
             if (question.context?.trim()) {
                 doc.moveDown(0.35);
+                doc.font("QuizBold").fontSize(12).text("Contexto:", {
+                    continued: true,
+                });
                 doc.font("QuizRegular")
                     .fontSize(12)
-                    .text(sanitizeText(question.context));
+                    .text(` ${sanitizeText(question.context)}`);
             }
 
             doc.moveDown(0.35);
-            doc.font("QuizBold")
+            doc.font("QuizBold").fontSize(12).text("Comando:", {
+                continued: true,
+            });
+            doc.font("QuizRegular")
                 .fontSize(12)
-                .text(sanitizeText(question.command));
+                .text(` ${sanitizeText(question.command)}`);
 
             doc.moveDown(0.5);
             question.answers.forEach((answer, answerIndex) => {
@@ -235,10 +242,7 @@ export async function POST(req: Request) {
                 }
             }
 
-            doc.moveDown(0.7);
-            doc.font("QuizRegular").text(
-                "Resposta: __________________________",
-            );
+            doc.moveDown(1);
         });
 
         doc.end();
