@@ -199,25 +199,6 @@ export async function POST(req: Request) {
                     .text(` ${sanitizeText(question.context)}`);
             }
 
-            doc.moveDown(0.35);
-            doc.font("QuizBold").fontSize(12).text("Comando:", {
-                continued: true,
-            });
-            doc.font("QuizRegular")
-                .fontSize(12)
-                .text(` ${sanitizeText(question.command)}`);
-
-            doc.moveDown(0.5);
-            question.answers.forEach((answer, answerIndex) => {
-                const letter = String.fromCharCode(65 + answerIndex);
-                doc.font("QuizRegular").text(
-                    `${letter}) ${sanitizeText(answer.text)}`,
-                    {
-                        indent: 16,
-                    },
-                );
-            });
-
             if (imageBuffer && imageMetadata) {
                 try {
                     const currentAvailableHeight =
@@ -241,6 +222,25 @@ export async function POST(req: Request) {
                     console.error("Quiz PDF image render error:", error);
                 }
             }
+
+            doc.moveDown(0.35);
+            doc.font("QuizBold").fontSize(12).text("Comando:", {
+                continued: true,
+            });
+            doc.font("QuizRegular")
+                .fontSize(12)
+                .text(` ${sanitizeText(question.command)}`);
+
+            doc.moveDown(0.5);
+            question.answers.forEach((answer, answerIndex) => {
+                const letter = String.fromCharCode(65 + answerIndex);
+                doc.font("QuizRegular").text(
+                    `${letter}) ${sanitizeText(answer.text)}`,
+                    {
+                        indent: 16,
+                    },
+                );
+            });
 
             doc.moveDown(1);
         });
