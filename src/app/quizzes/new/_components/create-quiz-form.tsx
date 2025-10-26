@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, useRef, useState } from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { FileDown, FileText, Loader2, X } from "lucide-react";
@@ -34,13 +35,20 @@ import { QuestionFields } from "./question-fields";
 
 type QuizPreview = {
     title: string;
+    course: string;
     description?: string;
     questions: Array<{
         context?: string;
         command: string;
+        capacity: string;
+        difficulty: string;
+        knowledgeObjects: string[];
+        competencies: string[];
+        cognitiveLevels: string[];
         answers: Array<{
             text: string;
             isCorrect: boolean;
+            justification: string;
         }>;
         imageHint?: string;
         image?: {
@@ -53,16 +61,28 @@ type QuizPreview = {
 
 const AI_GENERATION_ENDPOINT = "/api/quizzes/generate";
 const MAX_MARKDOWN_FILE_SIZE = 512 * 1024; // 512 KB
+type PdfVariant = "full" | "student";
 
 const quizValuesToPreview = (values: QuizFormValues): QuizPreview => ({
     title: values.title,
+    course: values.course,
     description: values.description,
     questions: values.questions.map((question) => ({
         context: question.context?.trim() ? question.context : undefined,
-        command: question.command,
+        command: question.command.trim(),
+        capacity: question.capacity.trim(),
+        difficulty: question.difficulty,
+        knowledgeObjects: question.knowledgeObjects
+            .map((item) => item.trim())
+            .filter(Boolean),
+        competencies: question.competencies
+            .map((item) => item.trim())
+            .filter(Boolean),
+        cognitiveLevels: [...question.cognitiveLevels],
         answers: question.answers.map((answer, index) => ({
-            text: answer.text,
+            text: answer.text.trim(),
             isCorrect: index === question.correctAnswer,
+            justification: answer.justification.trim(),
         })),
         imageHint: question.imageHint?.trim() ? question.imageHint : undefined,
         image: question.image
@@ -78,12 +98,14 @@ const quizValuesToPreview = (values: QuizFormValues): QuizPreview => ({
 const generateQuizMarkdown = (quiz: QuizPreview) => {
     const lines: string[] = [`# ${quiz.title.trim() || "Quiz"}`];
 
+    lines.push("", `Curso: ${quiz.course.trim() || "Curso não informado"}`);
+
     if (quiz.description?.trim()) {
         lines.push("", quiz.description.trim());
     }
 
     quiz.questions.forEach((question, index) => {
-        lines.push("", `## Pergunta ${index + 1}`);
+        lines.push("", `## Item ${index + 1}`);
 
         if (question.context?.trim()) {
             lines.push(`Contexto: ${question.context.trim()}`);
@@ -91,9 +113,33 @@ const generateQuizMarkdown = (quiz: QuizPreview) => {
 
         lines.push(`Comando: ${question.command.trim()}`);
 
+        lines.push(`Capacidade avaliada: ${question.capacity.trim()}`);
+        lines.push(`Nível de dificuldade: ${question.difficulty}`);
+
+        if (question.knowledgeObjects.length > 0) {
+            lines.push(
+                `Objetos de conhecimento: ${question.knowledgeObjects.join(", ")}`,
+            );
+        }
+
+        if (question.competencies.length > 0) {
+            lines.push(
+                `Competências avaliadas: ${question.competencies.join(", ")}`,
+            );
+        }
+
+        if (question.cognitiveLevels.length > 0) {
+            lines.push(
+                `Níveis cognitivos (Bloom): ${question.cognitiveLevels.join(", ")}`,
+            );
+        }
+
+        lines.push("", "Alternativas:");
+
         question.answers.forEach((answer) => {
             const prefix = answer.isCorrect ? "- [x]" : "- [ ]";
             lines.push(`${prefix} ${answer.text.trim()}`);
+            lines.push(`    Justificativa: ${answer.justification.trim()}`);
         });
 
         if (question.imageHint?.trim()) {
@@ -151,13 +197,16 @@ export function CreateQuizForm() {
     const [generationInputError, setGenerationInputError] = useState<
         string | null
     >(null);
-    const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [exportingVariant, setExportingVariant] = useState<PdfVariant | null>(
+        null,
+    );
     const [pdfError, setPdfError] = useState<string | null>(null);
 
     const form = useForm<QuizFormValues>({
         resolver: zodResolver(quizSchema),
         defaultValues: {
             title: "",
+            course: "",
             description: "",
             questions: [createEmptyQuestion()],
         },
@@ -300,7 +349,7 @@ export function CreateQuizForm() {
         }
     };
 
-    const handleExportPdf = async () => {
+    const handleExportPdf = async (variant: PdfVariant) => {
         const isValid = await form.trigger();
 
         if (!isValid) {
@@ -314,14 +363,17 @@ export function CreateQuizForm() {
 
         try {
             setPdfError(null);
-            setIsExportingPdf(true);
+            setExportingVariant(variant);
 
             const response = await fetch("/api/quizzes/export", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(values),
+                body: JSON.stringify({
+                    ...values,
+                    variant,
+                }),
             });
 
             if (!response.ok) {
@@ -360,9 +412,10 @@ export function CreateQuizForm() {
                     : "Não foi possível gerar o PDF.",
             );
         } finally {
-            setIsExportingPdf(false);
+            setExportingVariant(null);
         }
     };
+    const isExportingPdf = exportingVariant !== null;
 
     return (
         <div className="grid gap-6">
@@ -370,9 +423,9 @@ export function CreateQuizForm() {
                 <CardHeader className="space-y-3">
                     <CardTitle>Gerar quiz com IA</CardTitle>
                     <CardDescription>
-                        Escreva um prompt descrevendo tema, nível de
-                        dificuldade, quantidade de perguntas e alternativas
-                        desejadas. A IA vai preencher o formulário
+                        Escreva um prompt descrevendo o tema, o curso técnico,
+                        as capacidades e a quantidade de itens desejada. A IA
+                        aplica as diretrizes pedagógicas e preenche o formulário
                         automaticamente.
                     </CardDescription>
                 </CardHeader>
@@ -385,9 +438,19 @@ export function CreateQuizForm() {
                                 setGenerationInputError(null);
                             }
                         }}
-                        placeholder="Ex.: Crie um quiz avançado sobre JavaScript com 5 perguntas, 4 alternativas cada, indique a resposta correta e traga uma breve descrição."
+                        placeholder="Ex.: Monte 4 itens para o curso Técnico em Enfermagem sobre cuidados pós-operatórios, nível de dificuldade médio, avaliando a capacidade de interpretar protocolos clínicos. Garanta alternativas com justificativas e sugestões de imagem."
                         className="min-h-32"
                     />
+                    <p className="text-muted-foreground text-xs">
+                        Consulte as{" "}
+                        <Link
+                            href="/docs/instrucoes"
+                            className="text-primary underline underline-offset-4"
+                        >
+                            diretrizes completas de elaboração
+                        </Link>{" "}
+                        para alinhar o pedido à IA.
+                    </p>
                     {isGenerating && (
                         <div className="flex items-center gap-2 rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -480,8 +543,8 @@ export function CreateQuizForm() {
                         <CardHeader className="space-y-3">
                             <CardTitle>Informações do quiz</CardTitle>
                             <CardDescription>
-                                Defina título e descrição. Você pode editar
-                                estes dados depois.
+                                Defina título, curso técnico avaliado e
+                                descrição. Você pode editar estes dados depois.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -494,6 +557,24 @@ export function CreateQuizForm() {
                                         <FormControl>
                                             <Input
                                                 placeholder="Ex.: Quiz de JavaScript"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="course"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            Curso técnico avaliado
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Ex.: Técnico em Desenvolvimento de Sistemas"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -552,15 +633,28 @@ export function CreateQuizForm() {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={handleExportPdf}
+                            onClick={() => handleExportPdf("full")}
                             disabled={isExportingPdf}
                         >
-                            {isExportingPdf ? (
+                            {exportingVariant === "full" ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
                                 <FileDown className="mr-2 h-4 w-4" />
                             )}
-                            Exportar PDF
+                            Exportar PDF (completo)
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleExportPdf("student")}
+                            disabled={isExportingPdf}
+                        >
+                            {exportingVariant === "student" ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <FileText className="mr-2 h-4 w-4" />
+                            )}
+                            Exportar PDF (aluno)
                         </Button>
                         <Button type="submit">Salvar quiz</Button>
                     </div>

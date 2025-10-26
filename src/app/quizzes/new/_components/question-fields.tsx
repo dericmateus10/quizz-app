@@ -1,7 +1,8 @@
 "use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Trash2 } from "lucide-react";
+import { Image as ImageIcon, Plus, Trash2 } from "lucide-react";
+import { useFieldArray, type UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,9 +22,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { useFieldArray, type UseFormReturn } from "react-hook-form";
 
-import { MAX_QUESTION_IMAGE_SIZE, type QuizFormValues } from "../schema";
+import {
+    BLOOM_LEVELS,
+    DIFFICULTY_LEVELS,
+    MAX_QUESTION_IMAGE_SIZE,
+    type QuizFormValues,
+} from "../schema";
 
 type QuestionFieldsProps = {
     form: UseFormReturn<QuizFormValues>;
@@ -47,24 +52,53 @@ export function QuestionFields({
     const imageInputRef = useRef<HTMLInputElement | null>(null);
 
     const image = form.watch(`questions.${questionIndex}.image`);
+    const knowledgeValues =
+        form.watch(`questions.${questionIndex}.knowledgeObjects`) ?? [];
+    const competencyValues =
+        form.watch(`questions.${questionIndex}.competencies`) ?? [];
 
-    const removeAnswer = (answerIndex: number) => {
-        answerArray.remove(answerIndex);
-        const selected = form.getValues(
-            `questions.${questionIndex}.correctAnswer`,
+    const appendKnowledge = () => {
+        form.setValue(
+            `questions.${questionIndex}.knowledgeObjects`,
+            [...knowledgeValues, ""],
+            { shouldDirty: true },
         );
+    };
 
-        if (selected === answerIndex) {
-            form.setValue(`questions.${questionIndex}.correctAnswer`, -1, {
-                shouldValidate: true,
-            });
-        } else if (selected > answerIndex) {
-            form.setValue(
-                `questions.${questionIndex}.correctAnswer`,
-                selected - 1,
-                { shouldValidate: true },
-            );
+    const removeKnowledge = (index: number) => {
+        if (knowledgeValues.length <= 1) {
+            return;
         }
+
+        const next = knowledgeValues.filter(
+            (_, itemIndex) => itemIndex !== index,
+        );
+        form.setValue(`questions.${questionIndex}.knowledgeObjects`, next, {
+            shouldDirty: true,
+            shouldValidate: true,
+        });
+    };
+
+    const appendCompetency = () => {
+        form.setValue(
+            `questions.${questionIndex}.competencies`,
+            [...competencyValues, ""],
+            { shouldDirty: true },
+        );
+    };
+
+    const removeCompetency = (index: number) => {
+        if (competencyValues.length <= 1) {
+            return;
+        }
+
+        const next = competencyValues.filter(
+            (_, itemIndex) => itemIndex !== index,
+        );
+        form.setValue(`questions.${questionIndex}.competencies`, next, {
+            shouldDirty: true,
+            shouldValidate: true,
+        });
     };
 
     const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -146,7 +180,8 @@ export function QuestionFields({
                 <div>
                     <CardTitle>{`Pergunta ${questionIndex + 1}`}</CardTitle>
                     <CardDescription>
-                        Defina o enunciado e as alternativas desta pergunta.
+                        Contextualize o item, defina metadados pedagógicos e
+                        escreva alternativas com justificativas.
                     </CardDescription>
                 </div>
                 {canRemove && (
@@ -160,7 +195,7 @@ export function QuestionFields({
                     </Button>
                 )}
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-6">
                 <FormField
                     control={form.control}
                     name={`questions.${questionIndex}.context`}
@@ -169,14 +204,15 @@ export function QuestionFields({
                             <FormLabel>Contexto (enunciado)</FormLabel>
                             <FormControl>
                                 <Textarea
-                                    placeholder="Descreva o cenário, texto de apoio ou dados que introduzem a questão."
+                                    placeholder="Apresente o cenário profissional ou a situação-problema que dá sentido ao item."
                                     {...field}
                                 />
                             </FormControl>
                             <FormMessage />
                             <p className="text-muted-foreground/80 mt-1 text-xs">
-                                Opcional. Deixe em branco se a pergunta não
-                                precisar de contexto.
+                                Utilize um único parágrafo objetivo. Deixe em
+                                branco apenas quando a questão não exigir
+                                contextualização.
                             </p>
                         </FormItem>
                     )}
@@ -190,7 +226,7 @@ export function QuestionFields({
                             <FormLabel>Comando</FormLabel>
                             <FormControl>
                                 <Textarea
-                                    placeholder="Declare o que o aluno deve responder ou selecionar."
+                                    placeholder="Instrua o aluno de forma direta e impessoal sobre o que precisa ser analisado ou respondido."
                                     {...field}
                                 />
                             </FormControl>
@@ -201,22 +237,243 @@ export function QuestionFields({
 
                 <FormField
                     control={form.control}
+                    name={`questions.${questionIndex}.capacity`}
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Capacidade avaliada</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder="Ex.: Interpretar diagramas de rede para identificar falhas."
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name={`questions.${questionIndex}.difficulty`}
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Nível de dificuldade</FormLabel>
+                            <FormControl>
+                                <RadioGroup
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    className="flex flex-wrap gap-3"
+                                >
+                                    {DIFFICULTY_LEVELS.map((level) => {
+                                        const inputId = `question-${questionIndex}-difficulty-${level}`;
+                                        return (
+                                            <div
+                                                key={level}
+                                                className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2"
+                                            >
+                                                <RadioGroupItem
+                                                    value={level}
+                                                    id={inputId}
+                                                />
+                                                <label
+                                                    htmlFor={inputId}
+                                                    className="text-sm font-medium"
+                                                >
+                                                    {level}
+                                                </label>
+                                            </div>
+                                        );
+                                    })}
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-3">
+                        <FormLabel>Objetos de conhecimento</FormLabel>
+                        <div className="space-y-3">
+                            {knowledgeValues.map((_, index) => (
+                                <div
+                                    key={`knowledge-${questionIndex}-${index}`}
+                                    className="flex items-start gap-2"
+                                >
+                                    <FormField
+                                        control={form.control}
+                                        name={`questions.${questionIndex}.knowledgeObjects.${index}`}
+                                        render={({ field }) => (
+                                            <FormItem className="flex-1">
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="Ex.: Conceitos de eletrônica analógica"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    {knowledgeValues.length > 1 && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                removeKnowledge(index)
+                                            }
+                                            className="mt-1 text-destructive hover:text-destructive"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">
+                                                Remover objeto
+                                            </span>
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={appendKnowledge}
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Adicionar objeto
+                        </Button>
+                        <p className="text-muted-foreground/80 text-xs">
+                            Liste os conteúdos necessários para resolver o item.
+                        </p>
+                    </div>
+
+                    <div className="space-y-3">
+                        <FormLabel>Competências avaliadas</FormLabel>
+                        <div className="space-y-3">
+                            {competencyValues.map((_, index) => (
+                                <div
+                                    key={`competency-${questionIndex}-${index}`}
+                                    className="flex items-start gap-2"
+                                >
+                                    <FormField
+                                        control={form.control}
+                                        name={`questions.${questionIndex}.competencies.${index}`}
+                                        render={({ field }) => (
+                                            <FormItem className="flex-1">
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="Ex.: Planejar ações de manutenção corretiva"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    {competencyValues.length > 1 && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                removeCompetency(index)
+                                            }
+                                            className="mt-1 text-destructive hover:text-destructive"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">
+                                                Remover competência
+                                            </span>
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={appendCompetency}
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Adicionar competência
+                        </Button>
+                        <p className="text-muted-foreground/80 text-xs">
+                            Descreva as competências que o estudante mobiliza ao
+                            resolver o item.
+                        </p>
+                    </div>
+                </div>
+
+                <FormField
+                    control={form.control}
+                    name={`questions.${questionIndex}.cognitiveLevels`}
+                    render={({ field }) => {
+                        const current = Array.isArray(field.value)
+                            ? field.value
+                            : [];
+                        const toggleLevel = (
+                            level: (typeof BLOOM_LEVELS)[number],
+                        ) => {
+                            const isActive = current.includes(level);
+                            const next = isActive
+                                ? current.filter((item) => item !== level)
+                                : [...current, level];
+                            field.onChange(next);
+                        };
+
+                        return (
+                            <FormItem>
+                                <FormLabel>
+                                    Níveis cognitivos (Taxonomia de Bloom)
+                                </FormLabel>
+                                <FormControl>
+                                    <div className="flex flex-wrap gap-2">
+                                        {BLOOM_LEVELS.map((level) => {
+                                            const isActive =
+                                                current.includes(level);
+                                            return (
+                                                <Button
+                                                    key={level}
+                                                    type="button"
+                                                    variant={
+                                                        isActive
+                                                            ? "default"
+                                                            : "outline"
+                                                    }
+                                                    onClick={() =>
+                                                        toggleLevel(level)
+                                                    }
+                                                >
+                                                    {level}
+                                                </Button>
+                                            );
+                                        })}
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                                <p className="text-muted-foreground/80 mt-1 text-xs">
+                                    Escolha pelo menos um nível compatível com a
+                                    habilidade exigida.
+                                </p>
+                            </FormItem>
+                        );
+                    }}
+                />
+
+                <FormField
+                    control={form.control}
                     name={`questions.${questionIndex}.imageHint`}
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>
-                                Sugestão de imagem (gerada pela IA)
-                            </FormLabel>
+                            <FormLabel>Sugestão de imagem</FormLabel>
                             <FormControl>
                                 <Textarea
-                                    placeholder="Ex.: Foto de um diagrama da pirâmide do conhecimento."
+                                    placeholder="Ex.: Fluxograma simplificado do processo de soldagem."
                                     {...field}
                                 />
                             </FormControl>
                             <FormMessage />
                             <p className="text-muted-foreground/80 mt-1 text-xs">
-                                Use este texto como referência para anexar uma
-                                imagem que complemente a pergunta.
+                                Indique um recurso visual que auxilie o aluno na
+                                interpretação do comando.
                             </p>
                         </FormItem>
                     )}
@@ -233,7 +490,7 @@ export function QuestionFields({
                     <p className="text-muted-foreground text-xs">
                         Formatos suportados: PNG, JPG, GIF, WEBP. Tamanho
                         máximo:{" "}
-                        {(MAX_QUESTION_IMAGE_SIZE / (1024 * 1024)).toFixed(1)}
+                        {(MAX_QUESTION_IMAGE_SIZE / (1024 * 1024)).toFixed(1)}{" "}
                         MB.
                     </p>
                     {imageError && (
@@ -276,8 +533,8 @@ export function QuestionFields({
                     control={form.control}
                     name={`questions.${questionIndex}.correctAnswer`}
                     render={({ field }) => (
-                        <FormItem className="space-y-3">
-                            <FormLabel>Alternativas</FormLabel>
+                        <FormItem className="space-y-4">
+                            <FormLabel>Alternativas e justificativas</FormLabel>
                             <FormControl>
                                 <RadioGroup
                                     value={
@@ -286,83 +543,90 @@ export function QuestionFields({
                                             ? String(field.value)
                                             : ""
                                     }
-                                    onValueChange={(value) => {
-                                        const parsed = Number(value);
-                                        field.onChange(parsed);
-                                    }}
-                                    className="grid gap-4"
+                                    onValueChange={(value) =>
+                                        field.onChange(Number(value))
+                                    }
+                                    className="space-y-4"
                                 >
                                     {answerArray.fields.map(
-                                        (answer, answerIndex) => (
-                                            <div
-                                                key={answer.id}
-                                                className="flex items-start gap-3 rounded-md border border-border/60 p-4"
-                                            >
-                                                <RadioGroupItem
-                                                    value={String(answerIndex)}
-                                                    id={`question-${questionIndex}-answer-${answerIndex}`}
-                                                    aria-label={`Marcar alternativa ${answerIndex + 1} como correta`}
-                                                    className="mt-1"
-                                                />
-                                                <div className="flex-1 space-y-2">
-                                                    <FormField
-                                                        control={form.control}
-                                                        name={`questions.${questionIndex}.answers.${answerIndex}.text`}
-                                                        render={({
-                                                            field: answerField,
-                                                        }) => (
-                                                            <FormItem>
-                                                                <FormLabel className="text-sm font-medium">
-                                                                    Alternativa{" "}
-                                                                    {answerIndex +
-                                                                        1}
-                                                                </FormLabel>
-                                                                <FormControl>
-                                                                    <Input
-                                                                        placeholder="Digite a alternativa"
-                                                                        {...answerField}
-                                                                    />
-                                                                </FormControl>
-                                                                <FormMessage />
-                                                            </FormItem>
+                                        (answer, answerIndex) => {
+                                            const letter = String.fromCharCode(
+                                                65 + answerIndex,
+                                            );
+                                            return (
+                                                <div
+                                                    key={answer.id}
+                                                    className="flex gap-3 rounded-md border border-border/60 p-4"
+                                                >
+                                                    <RadioGroupItem
+                                                        value={String(
+                                                            answerIndex,
                                                         )}
+                                                        id={`question-${questionIndex}-answer-${answerIndex}`}
+                                                        aria-label={`Marcar alternativa ${letter} como correta`}
+                                                        className="mt-1"
                                                     />
+                                                    <div className="flex-1 space-y-3">
+                                                        <div className="grid gap-2">
+                                                            <FormField
+                                                                control={
+                                                                    form.control
+                                                                }
+                                                                name={`questions.${questionIndex}.answers.${answerIndex}.text`}
+                                                                render={({
+                                                                    field: answerField,
+                                                                }) => (
+                                                                    <FormItem>
+                                                                        <FormLabel className="text-sm font-medium">
+                                                                            {`Alternativa ${letter}`}
+                                                                        </FormLabel>
+                                                                        <FormControl>
+                                                                            <Input
+                                                                                placeholder="Digite o texto da alternativa"
+                                                                                {...answerField}
+                                                                            />
+                                                                        </FormControl>
+                                                                        <FormMessage />
+                                                                    </FormItem>
+                                                                )}
+                                                            />
+                                                            <FormField
+                                                                control={
+                                                                    form.control
+                                                                }
+                                                                name={`questions.${questionIndex}.answers.${answerIndex}.justification`}
+                                                                render={({
+                                                                    field: justificationField,
+                                                                }) => (
+                                                                    <FormItem>
+                                                                        <FormLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                            Justificativa
+                                                                        </FormLabel>
+                                                                        <FormControl>
+                                                                            <Textarea
+                                                                                placeholder="Descreva por que esta alternativa é correta ou qual equívoco ela representa."
+                                                                                className="min-h-20"
+                                                                                {...justificationField}
+                                                                            />
+                                                                        </FormControl>
+                                                                        <FormMessage />
+                                                                    </FormItem>
+                                                                )}
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                {answerArray.fields.length >
-                                                    2 && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        onClick={() =>
-                                                            removeAnswer(
-                                                                answerIndex,
-                                                            )
-                                                        }
-                                                        className="text-destructive hover:text-destructive"
-                                                    >
-                                                        Remover
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        ),
+                                            );
+                                        },
                                     )}
                                 </RadioGroup>
                             </FormControl>
                             <FormMessage />
-                            <div className="-mx-4 mt-2 flex justify-between px-4">
-                                <span className="text-muted-foreground/80 text-xs">
-                                    Marque uma alternativa como correta.
-                                </span>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() =>
-                                        answerArray.append({ text: "" })
-                                    }
-                                >
-                                    Nova alternativa
-                                </Button>
-                            </div>
+                            <p className="text-muted-foreground/80 text-xs">
+                                Mantenha quatro alternativas distintas.
+                                Selecione a correta e descreva as justificativas
+                                do gabarito e dos distratores.
+                            </p>
                         </FormItem>
                     )}
                 />

@@ -25,6 +25,9 @@ export default function Home() {
                 <Button asChild variant="outline" size="lg">
                     <Link href="/docs/regras">Regras do projeto</Link>
                 </Button>
+                <Button asChild variant="outline" size="lg">
+                    <Link href="/docs/instrucoes">Diretrizes de itens</Link>
+                </Button>
             </div>
         </main>
     );

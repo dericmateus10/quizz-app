@@ -8,6 +8,8 @@ import { quizSchema } from "@/app/quizzes/new/schema";
 
 export const runtime = "nodejs";
 
+type PdfVariant = "full" | "student";
+
 const formatDate = () =>
     new Intl.DateTimeFormat("pt-BR", {
         dateStyle: "medium",
@@ -49,7 +51,32 @@ const dataUrlToBuffer = (dataUrl: string) => {
 
 export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
-    const parsed = quizSchema.safeParse(body);
+
+    if (!body || typeof body !== "object") {
+        return new Response(
+            JSON.stringify({
+                error: "Dados inválidos para exportação.",
+            }),
+            {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            },
+        );
+    }
+
+    const rawVariant =
+        typeof (body as { variant?: unknown }).variant === "string"
+            ? ((body as { variant?: string }).variant ?? "")
+            : "";
+    const variant: PdfVariant = rawVariant === "student" ? "student" : "full";
+
+    const quizPayload =
+        "quiz" in body &&
+        typeof (body as { quiz?: unknown }).quiz !== "undefined"
+            ? (body as { quiz: unknown }).quiz
+            : body;
+
+    const parsed = quizSchema.safeParse(quizPayload);
 
     if (!parsed.success) {
         return new Response(
@@ -64,6 +91,9 @@ export async function POST(req: Request) {
     }
 
     const quiz = parsed.data;
+    const includeMetadata = variant === "full";
+    const includeJustification = variant === "full";
+    const includeImageHint = variant === "full";
 
     try {
         const fontsDir = path.join(process.cwd(), "public", "fonts");
@@ -104,6 +134,13 @@ export async function POST(req: Request) {
         doc.font("QuizBold")
             .fontSize(20)
             .text(sanitizeText(quiz.title || "Quiz"), {
+                align: "center",
+            });
+
+        doc.moveDown();
+        doc.font("QuizRegular")
+            .fontSize(12)
+            .text(`Curso: ${sanitizeText(quiz.course)}`, {
                 align: "center",
             });
 
@@ -173,9 +210,13 @@ export async function POST(req: Request) {
             }
 
             const estimatedHeight =
-                70 +
-                question.answers.length * 24 +
+                120 +
+                question.answers.length * (includeJustification ? 44 : 24) +
                 (question.context?.trim() ? 40 : 0) +
+                (includeMetadata && question.knowledgeObjects.length ? 24 : 0) +
+                (includeMetadata && question.competencies.length ? 24 : 0) +
+                (includeMetadata && question.cognitiveLevels.length ? 24 : 0) +
+                (includeImageHint && question.imageHint?.trim() ? 24 : 0) +
                 (imageMetadata ? imageMetadata.height + 30 : 0) +
                 26;
 
@@ -231,16 +272,95 @@ export async function POST(req: Request) {
                 .fontSize(12)
                 .text(` ${sanitizeText(question.command)}`);
 
+            if (includeMetadata) {
+                doc.moveDown(0.35);
+                doc.font("QuizBold").fontSize(12).text("Capacidade avaliada:", {
+                    continued: true,
+                });
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(` ${sanitizeText(question.capacity)}`);
+
+                doc.moveDown(0.35);
+                doc.font("QuizBold")
+                    .fontSize(12)
+                    .text("Nível de dificuldade:", {
+                        continued: true,
+                    });
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(` ${sanitizeText(question.difficulty)}`);
+            }
+
+            if (includeMetadata && question.knowledgeObjects.length > 0) {
+                doc.moveDown(0.35);
+                doc.font("QuizBold")
+                    .fontSize(12)
+                    .text("Objetos de conhecimento:", {
+                        continued: true,
+                    });
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(
+                        ` ${sanitizeText(question.knowledgeObjects.join("; "))}`,
+                    );
+            }
+
+            if (includeMetadata && question.competencies.length > 0) {
+                doc.moveDown(0.35);
+                doc.font("QuizBold").fontSize(12).text("Competências:", {
+                    continued: true,
+                });
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(` ${sanitizeText(question.competencies.join("; "))}`);
+            }
+
+            if (includeMetadata && question.cognitiveLevels.length > 0) {
+                doc.moveDown(0.35);
+                doc.font("QuizBold")
+                    .fontSize(12)
+                    .text("Níveis cognitivos (Bloom):", {
+                        continued: true,
+                    });
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(
+                        ` ${sanitizeText(question.cognitiveLevels.join("; "))}`,
+                    );
+            }
+
             doc.moveDown(0.5);
             question.answers.forEach((answer, answerIndex) => {
                 const letter = String.fromCharCode(65 + answerIndex);
-                doc.font("QuizRegular").text(
-                    `${letter}) ${sanitizeText(answer.text)}`,
-                    {
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(`${letter}) ${sanitizeText(answer.text)}`, {
                         indent: 16,
-                    },
-                );
+                    });
+                if (includeJustification) {
+                    doc.font("QuizRegular")
+                        .fontSize(10)
+                        .fillColor("#555555")
+                        .text(
+                            `Justificativa: ${sanitizeText(answer.justification)}`,
+                            {
+                                indent: 32,
+                            },
+                        )
+                        .fillColor("#000000");
+                }
             });
+
+            if (includeImageHint && question.imageHint?.trim()) {
+                doc.moveDown(0.5);
+                doc.font("QuizBold").fontSize(12).text("Sugestão de imagem:", {
+                    continued: true,
+                });
+                doc.font("QuizRegular")
+                    .fontSize(12)
+                    .text(` ${sanitizeText(question.imageHint)}`);
+            }
 
             doc.moveDown(1);
         });
@@ -249,7 +369,10 @@ export async function POST(req: Request) {
         await docEnd;
 
         const pdfBuffer = Buffer.concat(chunks);
-        const filename = `${slugify(quiz.title)}.pdf`;
+        const filename =
+            variant === "student"
+                ? `${slugify(quiz.title)}-aluno.pdf`
+                : `${slugify(quiz.title)}.pdf`;
 
         return new Response(pdfBuffer, {
             status: 200,

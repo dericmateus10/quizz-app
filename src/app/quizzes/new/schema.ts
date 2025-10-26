@@ -2,6 +2,17 @@ import { z } from "zod";
 
 export const MAX_QUESTION_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 
+export const BLOOM_LEVELS = [
+    "Lembrar",
+    "Entender",
+    "Aplicar",
+    "Analisar",
+    "Avaliar",
+    "Criar",
+] as const;
+
+export const DIFFICULTY_LEVELS = ["Fácil", "Médio", "Difícil"] as const;
+
 const questionImageSchema = z.object({
     name: z.string().min(1, "Informe o nome da imagem"),
     dataUrl: z
@@ -19,8 +30,14 @@ const questionImageSchema = z.object({
     type: z.string().min(1, "Tipo de mídia inválido"),
 });
 
+const stringListSchema = (label: string) =>
+    z
+        .array(z.string().trim().min(1, `Informe ${label}`))
+        .min(1, `Adicione pelo menos um ${label}`);
+
 export const answerSchema = z.object({
     text: z.string().min(1, "Informe a alternativa"),
+    justification: z.string().min(1, "Descreva a justificativa da alternativa"),
 });
 
 export const questionSchema = z
@@ -29,13 +46,27 @@ export const questionSchema = z
         command: z.string().min(1, "Informe o comando da pergunta"),
         answers: z
             .array(answerSchema)
-            .min(2, "Adicione pelo menos duas alternativas"),
-        correctAnswer: z.number().min(0, "Selecione a alternativa correta"),
+            .length(4, "Cada item deve conter exatamente quatro alternativas"),
+        correctAnswer: z
+            .number()
+            .min(0, "Selecione a alternativa correta")
+            .max(3, "Selecione a alternativa correta"),
         imageHint: z
             .string()
             .max(400, "Sugestão de imagem muito longa")
             .optional(),
         image: questionImageSchema.optional(),
+        capacity: z.string().min(1, "Informe a capacidade avaliada"),
+        difficulty: z
+            .enum(DIFFICULTY_LEVELS)
+            .describe("Selecione o nível de dificuldade"),
+        knowledgeObjects: stringListSchema(
+            "objeto de conhecimento relacionado",
+        ),
+        competencies: stringListSchema("competência"),
+        cognitiveLevels: z
+            .array(z.enum(BLOOM_LEVELS))
+            .min(1, "Selecione ao menos um nível cognitivo"),
     })
     .superRefine((question, ctx) => {
         if (question.correctAnswer >= question.answers.length) {
@@ -49,6 +80,7 @@ export const questionSchema = z
 
 export const quizSchema = z.object({
     title: z.string().min(1, "Informe o título do quiz"),
+    course: z.string().min(1, "Informe o curso técnico avaliado"),
     description: z.string().optional(),
     questions: z.array(questionSchema).min(1, "Crie pelo menos uma pergunta"),
 });
@@ -56,10 +88,25 @@ export const quizSchema = z.object({
 export type QuizFormValues = z.input<typeof quizSchema>;
 export type QuestionFormValues = z.input<typeof questionSchema>;
 
+const createEmptyAnswer = (): QuestionFormValues["answers"][number] => ({
+    text: "",
+    justification: "",
+});
+
 export const createEmptyQuestion = (): QuestionFormValues => ({
     context: "",
     command: "",
-    answers: [{ text: "" }, { text: "" }],
+    answers: [
+        createEmptyAnswer(),
+        createEmptyAnswer(),
+        createEmptyAnswer(),
+        createEmptyAnswer(),
+    ],
     correctAnswer: -1,
     imageHint: "",
+    capacity: "",
+    difficulty: "Médio",
+    knowledgeObjects: [""],
+    competencies: [""],
+    cognitiveLevels: [],
 });
